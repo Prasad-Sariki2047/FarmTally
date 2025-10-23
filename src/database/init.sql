@@ -73,12 +73,13 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     emergency_contact JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);-- Bus
-iness relationships table
+);
+
+-- Business relationships table
 CREATE TABLE IF NOT EXISTS business_relationships (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    farm_admin_id UUID NOT NULL,
-    service_provider_id UUID NOT NULL,
+    farm_admin_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    service_provider_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     type relationship_type_enum NOT NULL,
     status relationship_status_enum NOT NULL DEFAULT 'pending',
     established_date TIMESTAMP WITH TIME ZONE,
@@ -92,7 +93,7 @@ CREATE TABLE IF NOT EXISTS business_relationships (
 -- Invitations table
 CREATE TABLE IF NOT EXISTS invitations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    inviter_id UUID NOT NULL,
+    inviter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     invitee_email VARCHAR(255) NOT NULL,
     invitee_role user_role_enum NOT NULL,
     relationship_type relationship_type_enum NOT NULL,
