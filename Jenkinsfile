@@ -48,12 +48,16 @@ pipeline {
             steps {
                 echo 'Setting up build environment...'
                 
-                // Install Node.js dependencies
-                sh '''
-                    node --version
-                    npm --version
-                    npm ci --only=production
-                '''
+                script {
+                    // Use Docker to run Node.js commands
+                    docker.image('node:18-alpine').inside {
+                        sh '''
+                            node --version
+                            npm --version
+                            npm ci --only=production
+                        '''
+                    }
+                }
             }
         }
         
@@ -62,7 +66,9 @@ pipeline {
                 echo 'Running basic tests...'
                 script {
                     try {
-                        sh 'npm test -- --ci --watchAll=false --passWithNoTests'
+                        docker.image('node:18-alpine').inside {
+                            sh 'npm test -- --ci --watchAll=false --passWithNoTests'
+                        }
                     } catch (Exception e) {
                         echo "Tests completed with warnings: ${e.getMessage()}"
                     }
@@ -75,7 +81,9 @@ pipeline {
                 echo 'Building TypeScript application...'
                 script {
                     try {
-                        sh 'npm run build'
+                        docker.image('node:18-alpine').inside {
+                            sh 'npm run build'
+                        }
                     } catch (Exception e) {
                         echo "Build completed with warnings: ${e.getMessage()}"
                     }
