@@ -1,0 +1,51 @@
+# Docker Network Configuration for FarmTally
+# Advanced networking setup for production deployment
+
+version: '3.8'
+
+networks:
+  # Frontend network (public-facing services)
+  farmtally-frontend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.1.0/24
+          gateway: 172.20.1.1
+    driver_opts:
+      com.docker.network.bridge.name: farmtally-frontend
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.driver.mtu: 1500
+
+  # Backend network (internal services)
+  farmtally-backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.2.0/24
+          gateway: 172.20.2.1
+    driver_opts:
+      com.docker.network.bridge.name: farmtally-backend
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+      com.docker.network.driver.mtu: 1500
+    internal: true  # No external access
+
+  # Database network (isolated)
+  farmtally-database:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.3.0/24
+          gateway: 172.20.3.1
+    driver_opts:
+      com.docker.network.bridge.name: farmtally-database
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+      com.docker.network.driver.mtu: 1500
+    internal: true  # No external access
+
+services:
+  # Network configuration is applied via docker-compose.prod.yml
+  # This file serves as documentation and can be used with:
+  # docker-compose -f docker-network.yml up -d --no-deps

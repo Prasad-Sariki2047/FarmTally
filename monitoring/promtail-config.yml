@@ -1,0 +1,155 @@
+# Promtail Configuration for FarmTally Log Collection
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # FarmTally Application Logs
+  - job_name: farmtally-app
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: farmtally-app
+          service: farmtally
+          __path__: /opt/farmtally/logs/app/*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            service: service
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - labels:
+          level:
+          service:
+
+  # Nginx Access Logs
+  - job_name: nginx-access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-access
+          service: nginx
+          __path__: /opt/farmtally/logs/nginx/access.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<remote_addr>\S+) - (?P<remote_user>\S+) \[(?P<time_local>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) (?P<protocol>\S+)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)"'
+      - timestamp:
+          source: time_local
+          format: 02/Jan/2006:15:04:05 -0700
+      - labels:
+          method:
+          status:
+          path:
+
+  # Nginx Error Logs
+  - job_name: nginx-error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-error
+          service: nginx
+          __path__: /opt/farmtally/logs/nginx/error.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<message>.*)'
+      - timestamp:
+          source: timestamp
+          format: 2006/01/02 15:04:05
+      - labels:
+          level:
+
+  # System Logs
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          service: system
+          __path__: /var/log/syslog
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\w{3} \d{1,2} \d{2}:\d{2}:\d{2}) (?P<hostname>\S+) (?P<service>\S+): (?P<message>.*)'
+      - timestamp:
+          source: timestamp
+          format: Jan 2 15:04:05
+      - labels:
+          hostname:
+          service:
+
+  # Docker Container Logs
+  - job_name: docker
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          service: docker
+          __path__: /var/log/docker.log
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: time
+            level: level
+            message: msg
+            container: attrs.tag
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      - labels:
+          level:
+          container:
+
+  # PostgreSQL Logs
+  - job_name: postgresql
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: postgresql
+          service: database
+          __path__: /var/log/postgresql/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w{3}) \[(?P<pid>\d+)\]: \[(?P<line>\d+)-(?P<session>\d+)\] user=(?P<user>\S+),db=(?P<database>\S+),app=(?P<application>\S+),client=(?P<client>\S+) (?P<level>\w+): (?P<message>.*)'
+      - timestamp:
+          source: timestamp
+          format: 2006-01-02 15:04:05.000 MST
+      - labels:
+          level:
+          user:
+          database:
+          application:
+
+  # Redis Logs
+  - job_name: redis
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: redis
+          service: cache
+          __path__: /var/log/redis/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<pid>\d+):(?P<role>\w+) (?P<timestamp>\d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2}\.\d{3}) (?P<level>\S+) (?P<message>.*)'
+      - timestamp:
+          source: timestamp
+          format: 02 Jan 2006 15:04:05.000
+      - labels:
+          level:
+          role:

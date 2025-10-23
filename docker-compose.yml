@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # FarmTally User Management Service
+  farmtally-user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: farmtally-user-service
+    restart: unless-stopped
+    ports:
+      - "3001:3000"  # External:Internal - Isolated port
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - EMAIL_SERVICE_URL=${EMAIL_SERVICE_URL}
+      - SMS_SERVICE_URL=${SMS_SERVICE_URL}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    networks:
+      - farmtally-network
+    depends_on:
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: farmtally-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-farmtally}
+      - POSTGRES_USER=${POSTGRES_USER:-farmtally_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5433:5432"  # External:Internal - Isolated port
+    networks:
+      - farmtally-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farmtally_user} -d ${POSTGRES_DB:-farmtally}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: farmtally-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6380:6379"  # External:Internal - Isolated port
+    networks:
+      - farmtally-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Nginx Reverse Proxy (optional, for load balancing)
+  nginx:
+    image: nginx:alpine
+    container_name: farmtally-nginx
+    restart: unless-stopped
+    ports:
+      - "8082:80"   # External:Internal - Isolated HTTP port
+      - "8443:443"  # External:Internal - Isolated HTTPS port
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    networks:
+      - farmtally-network
+    depends_on:
+      - farmtally-user-service
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  farmtally-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16  # Isolated subnet to avoid conflicts

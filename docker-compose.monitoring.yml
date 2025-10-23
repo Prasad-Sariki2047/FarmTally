@@ -1,0 +1,217 @@
+# Docker Compose for FarmTally Monitoring Stack
+# Includes Prometheus, Grafana, Alertmanager, and exporters
+
+version: '3.8'
+
+services:
+  # Prometheus - Metrics collection and alerting
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: farmtally-prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"  # External:Internal - Isolated port
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - farmtally-monitoring
+    depends_on:
+      - node-exporter
+      - cadvisor
+
+  # Grafana - Visualization and dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: farmtally-grafana
+    restart: unless-stopped
+    ports:
+      - "3002:3000"  # External:Internal - Isolated port
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=farmtally_grafana_admin_2024
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=147.93.153.247
+      - GF_SERVER_ROOT_URL=http://147.93.153.247:3001
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=localhost:587
+      - GF_SMTP_USER=grafana@farmtally.com
+      - GF_SMTP_PASSWORD=your-smtp-password
+      - GF_SMTP_FROM_ADDRESS=grafana@farmtally.com
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana-datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - farmtally-monitoring
+    depends_on:
+      - prometheus
+
+  # Alertmanager - Alert routing and notifications
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: farmtally-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9094:9093"  # External:Internal - Isolated port
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://147.93.153.247:9093'
+    networks:
+      - farmtally-monitoring
+
+  # Node Exporter - System metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: farmtally-node-exporter
+    restart: unless-stopped
+    ports:
+      - "9101:9100"  # External:Internal - Isolated port
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - farmtally-monitoring
+
+  # cAdvisor - Container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: farmtally-cadvisor
+    restart: unless-stopped
+    ports:
+      - "8083:8080"  # External:Internal - Isolated port
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    networks:
+      - farmtally-monitoring
+
+  # PostgreSQL Exporter
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: farmtally-postgres-exporter
+    restart: unless-stopped
+    ports:
+      - "9187:9187"
+    environment:
+      - DATA_SOURCE_NAME=postgresql://farmtally_prod_user:${POSTGRES_PASSWORD}@postgres:5432/farmtally_prod?sslmode=disable
+    networks:
+      - farmtally-monitoring
+      - farmtally-network
+    depends_on:
+      - postgres
+
+  # Redis Exporter
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: farmtally-redis-exporter
+    restart: unless-stopped
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    networks:
+      - farmtally-monitoring
+      - farmtally-network
+    depends_on:
+      - redis
+
+  # Nginx Exporter
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    container_name: farmtally-nginx-exporter
+    restart: unless-stopped
+    ports:
+      - "9113:9113"
+    command:
+      - '-nginx.scrape-uri=http://nginx:8080/nginx_status'
+    networks:
+      - farmtally-monitoring
+      - farmtally-network
+    depends_on:
+      - nginx
+
+  # Blackbox Exporter - Endpoint monitoring
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: farmtally-blackbox-exporter
+    restart: unless-stopped
+    ports:
+      - "9115:9115"
+    volumes:
+      - ./monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    networks:
+      - farmtally-monitoring
+
+  # Log aggregation with Loki
+  loki:
+    image: grafana/loki:latest
+    container_name: farmtally-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - farmtally-monitoring
+
+  # Promtail - Log shipper
+  promtail:
+    image: grafana/promtail:latest
+    container_name: farmtally-promtail
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /opt/farmtally/logs:/opt/farmtally/logs:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - farmtally-monitoring
+    depends_on:
+      - loki
+
+volumes:
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  alertmanager_data:
+    driver: local
+  loki_data:
+    driver: local
+
+networks:
+  farmtally-monitoring:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+  farmtally-network:
+    external: true

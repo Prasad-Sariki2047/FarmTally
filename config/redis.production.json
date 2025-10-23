@@ -1,0 +1,38 @@
+{
+  "development": {
+    "host": "localhost",
+    "port": 6379,
+    "password": null,
+    "db": 0,
+    "retryDelayOnFailover": 100,
+    "maxRetriesPerRequest": 3,
+    "lazyConnect": true
+  },
+  "production": {
+    "host": "147.93.153.247",
+    "port": 6379,
+    "password": "${REDIS_PASSWORD}",
+    "db": 0,
+    "connectTimeout": 5000,
+    "commandTimeout": 5000,
+    "retryDelayOnFailover": 1000,
+    "maxRetriesPerRequest": 3,
+    "lazyConnect": true,
+    "keepAlive": 30000,
+    "family": 4,
+    "tls": {
+      "rejectUnauthorized": false
+    },
+    "retry_strategy": {
+      "times": 3,
+      "delay": 1000
+    },
+    "pool": {
+      "min": 2,
+      "max": 20
+    },
+    "keyPrefix": "farmtally:prod:",
+    "enableReadyCheck": true,
+    "maxLoadingTimeout": 5000
+  }
+}

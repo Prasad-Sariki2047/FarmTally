@@ -1,0 +1,49 @@
+{
+  "development": {
+    "provider": "mock",
+    "enabled": false,
+    "from": "+1234567890",
+    "rateLimit": {
+      "max": 10,
+      "window": 3600000
+    }
+  },
+  "production": {
+    "provider": "twilio",
+    "enabled": true,
+    "twilio": {
+      "accountSid": "${SMS_ACCOUNT_SID}",
+      "authToken": "${SMS_AUTH_TOKEN}",
+      "from": "${SMS_FROM_NUMBER}",
+      "webhookUrl": "https://147.93.153.247/api/sms/webhook",
+      "statusCallback": "https://147.93.153.247/api/sms/status"
+    },
+    "rateLimit": {
+      "max": 50,
+      "window": 3600000,
+      "perUser": {
+        "max": 5,
+        "window": 3600000
+      }
+    },
+    "retry": {
+      "attempts": 3,
+      "delay": 5000
+    },
+    "templates": {
+      "otp": "Your FarmTally verification code is: {{code}}. Valid for {{expires}} minutes.",
+      "welcome": "Welcome to FarmTally! Your account has been activated.",
+      "passwordReset": "Your FarmTally password reset code is: {{code}}",
+      "loginAlert": "New login detected on your FarmTally account from {{location}}"
+    },
+    "validation": {
+      "enabled": true,
+      "format": "E.164",
+      "allowedCountries": ["US", "CA", "MX", "GB", "AU"]
+    },
+    "blacklist": {
+      "enabled": true,
+      "numbers": []
+    }
+  }
+}

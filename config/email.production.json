@@ -1,0 +1,57 @@
+{
+  "development": {
+    "service": "ethereal",
+    "host": "smtp.ethereal.email",
+    "port": 587,
+    "secure": false,
+    "auth": {
+      "user": "test@ethereal.email",
+      "pass": "test_password"
+    },
+    "from": "dev@farmtally.local",
+    "templates": {
+      "dir": "./templates/email",
+      "engine": "handlebars"
+    }
+  },
+  "production": {
+    "service": "hostinger",
+    "host": "smtp.hostinger.com",
+    "port": 587,
+    "secure": false,
+    "auth": {
+      "user": "${SMTP_USER}",
+      "pass": "${SMTP_PASS}"
+    },
+    "from": {
+      "name": "FarmTally System",
+      "address": "noreply@farmtally.in"
+    },
+    "templates": {
+      "dir": "/opt/farmtally/templates/email",
+      "engine": "handlebars",
+      "cache": true
+    },
+    "rateLimit": {
+      "max": 100,
+      "window": 3600000
+    },
+    "retry": {
+      "attempts": 3,
+      "delay": 2000
+    },
+    "pool": true,
+    "maxConnections": 5,
+    "maxMessages": 100,
+    "rateDelta": 1000,
+    "rateLimit": 5,
+    "tls": {
+      "rejectUnauthorized": true
+    },
+    "dkim": {
+      "domainName": "farmtally.in",
+      "keySelector": "default",
+      "privateKey": "${DKIM_PRIVATE_KEY}"
+    }
+  }
+}

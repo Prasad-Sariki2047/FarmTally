@@ -1,0 +1,104 @@
+version: '3.8'
+
+# Production overrides for deployment on 147.93.153.247
+services:
+  farmtally-user-service:
+    image: farmtally/user-service:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - ENABLE_METRICS=true
+      - METRICS_PORT=9090
+    ports:
+      - "3001:3000"  # FarmTally app port (shared server)
+      - "9090:9090"  # Metrics port
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    environment:
+      - POSTGRES_DB=farmtally_prod
+      - POSTGRES_USER=farmtally_prod_user
+    volumes:
+      - /opt/farmtally/data/postgres:/var/lib/postgresql/data
+      - ./backups:/backups
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    volumes:
+      - /opt/farmtally/data/redis:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    ports:
+      - "8082:80"   # FarmTally HTTP (shared server)
+      - "8443:443"  # FarmTally HTTPS (shared server)
+    volumes:
+      - /opt/farmtally/ssl:/etc/nginx/ssl:ro
+      - /opt/farmtally/logs/nginx:/var/log/nginx
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/farmtally/data/postgres
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/farmtally/data/redis

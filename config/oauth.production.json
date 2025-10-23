@@ -1,0 +1,51 @@
+{
+  "development": {
+    "google": {
+      "clientId": "dev-google-client-id",
+      "clientSecret": "dev-google-client-secret",
+      "redirectUri": "http://localhost:3000/api/auth/google/callback",
+      "scope": ["openid", "email", "profile"]
+    }
+  },
+  "production": {
+    "google": {
+      "clientId": "${GOOGLE_CLIENT_ID}",
+      "clientSecret": "${GOOGLE_CLIENT_SECRET}",
+      "redirectUri": "https://147.93.153.247/api/auth/google/callback",
+      "scope": ["openid", "email", "profile"],
+      "hostedDomain": null,
+      "prompt": "select_account",
+      "accessType": "offline",
+      "includeGrantedScopes": true
+    },
+    "microsoft": {
+      "enabled": false,
+      "clientId": "${MICROSOFT_CLIENT_ID}",
+      "clientSecret": "${MICROSOFT_CLIENT_SECRET}",
+      "redirectUri": "https://147.93.153.247/api/auth/microsoft/callback",
+      "scope": ["openid", "email", "profile"],
+      "tenant": "common"
+    },
+    "facebook": {
+      "enabled": false,
+      "clientId": "${FACEBOOK_CLIENT_ID}",
+      "clientSecret": "${FACEBOOK_CLIENT_SECRET}",
+      "redirectUri": "https://147.93.153.247/api/auth/facebook/callback",
+      "scope": ["email", "public_profile"]
+    },
+    "github": {
+      "enabled": false,
+      "clientId": "${GITHUB_CLIENT_ID}",
+      "clientSecret": "${GITHUB_CLIENT_SECRET}",
+      "redirectUri": "https://147.93.153.247/api/auth/github/callback",
+      "scope": ["user:email"]
+    },
+    "linkedin": {
+      "enabled": false,
+      "clientId": "${LINKEDIN_CLIENT_ID}",
+      "clientSecret": "${LINKEDIN_CLIENT_SECRET}",
+      "redirectUri": "https://147.93.153.247/api/auth/linkedin/callback",
+      "scope": ["r_liteprofile", "r_emailaddress"]
+    }
+  }
+}

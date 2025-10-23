@@ -1,0 +1,140 @@
+# Alertmanager Configuration for FarmTally
+# Handles alert routing and notifications
+
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@farmtally.com'
+  smtp_auth_username: 'alerts@farmtally.com'
+  smtp_auth_password: 'your-smtp-password'
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alerts
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default-receiver'
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      repeat_interval: 5m
+
+    # Database alerts
+    - match:
+        service: database
+      receiver: 'database-team'
+      group_interval: 5m
+
+    # Application alerts
+    - match:
+        service: farmtally
+      receiver: 'dev-team'
+      group_interval: 5m
+
+    # System alerts
+    - match:
+        service: system
+      receiver: 'ops-team'
+      group_interval: 10m
+
+# Inhibition rules to suppress redundant alerts
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+
+  - source_match:
+      alertname: 'FarmTallyAppDown'
+    target_match_re:
+      alertname: 'FarmTally.*'
+    equal: ['instance']
+
+# Notification receivers
+receivers:
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'admin@farmtally.com'
+        subject: 'FarmTally Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Labels: {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+          {{ end }}
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'admin@farmtally.com,ops@farmtally.com'
+        subject: '🚨 CRITICAL: FarmTally Alert - {{ .GroupLabels.alertname }}'
+        body: |
+          🚨 CRITICAL ALERT 🚨
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt }}
+          {{ end }}
+          
+          Please investigate immediately!
+    # Slack notification for critical alerts
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#alerts'
+        title: '🚨 Critical FarmTally Alert'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          {{ end }}
+        color: 'danger'
+
+  - name: 'database-team'
+    email_configs:
+      - to: 'dba@farmtally.com,admin@farmtally.com'
+        subject: 'FarmTally Database Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          Database Alert Detected
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Database: {{ .Labels.instance }}
+          {{ end }}
+
+  - name: 'dev-team'
+    email_configs:
+      - to: 'dev@farmtally.com,admin@farmtally.com'
+        subject: 'FarmTally Application Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          Application Alert Detected
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          {{ end }}
+
+  - name: 'ops-team'
+    email_configs:
+      - to: 'ops@farmtally.com,admin@farmtally.com'
+        subject: 'FarmTally System Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          System Alert Detected
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Server: {{ .Labels.instance }}
+          {{ end }}

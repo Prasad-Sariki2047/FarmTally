@@ -1,0 +1,223 @@
+# Prometheus Alert Rules for FarmTally
+# Defines alerting conditions for system monitoring
+
+groups:
+  - name: farmtally.rules
+    rules:
+      # System Resource Alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80% for more than 5 minutes on {{ $labels.instance }}"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 85% for more than 5 minutes on {{ $labels.instance }}"
+
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_free_bytes{fstype!="tmpfs"}) / node_filesystem_size_bytes{fstype!="tmpfs"} * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "High disk usage detected"
+          description: "Disk usage is above 90% for more than 5 minutes on {{ $labels.instance }} ({{ $labels.mountpoint }})"
+
+      - alert: HighSystemLoad
+        expr: node_load15 > 4
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High system load detected"
+          description: "System load average is {{ $value }} for more than 5 minutes on {{ $labels.instance }}"
+
+      # Application Alerts
+      - alert: FarmTallyAppDown
+        expr: up{job="farmtally-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: farmtally
+        annotations:
+          summary: "FarmTally application is down"
+          description: "FarmTally application has been down for more than 1 minute"
+
+      - alert: FarmTallyHighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="farmtally-app"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: farmtally
+        annotations:
+          summary: "FarmTally high response time"
+          description: "95th percentile response time is {{ $value }}s for more than 5 minutes"
+
+      - alert: FarmTallyHighErrorRate
+        expr: rate(http_requests_total{job="farmtally-app",status=~"5.."}[5m]) / rate(http_requests_total{job="farmtally-app"}[5m]) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: farmtally
+        annotations:
+          summary: "FarmTally high error rate"
+          description: "Error rate is {{ $value }}% for more than 5 minutes"
+
+      # Database Alerts
+      - alert: PostgreSQLDown
+        expr: up{job="postgres-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been down for more than 1 minute"
+
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "PostgreSQL high connection usage"
+          description: "PostgreSQL connection usage is {{ $value }}% for more than 5 minutes"
+
+      - alert: PostgreSQLSlowQueries
+        expr: rate(pg_stat_database_tup_returned[5m]) / rate(pg_stat_database_tup_fetched[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "PostgreSQL query efficiency is low for more than 10 minutes"
+
+      # Redis Alerts
+      - alert: RedisDown
+        expr: up{job="redis-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: cache
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache server has been down for more than 1 minute"
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: cache
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value }}% for more than 5 minutes"
+
+      - alert: RedisHighConnections
+        expr: redis_connected_clients > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: cache
+        annotations:
+          summary: "Redis high connection count"
+          description: "Redis has {{ $value }} connected clients for more than 5 minutes"
+
+      # Container Alerts
+      - alert: ContainerDown
+        expr: up{job="cadvisor"} == 0 or container_last_seen{name=~"farmtally-.*"} < time() - 60
+        for: 1m
+        labels:
+          severity: critical
+          service: container
+        annotations:
+          summary: "Container is down"
+          description: "Container {{ $labels.name }} has been down for more than 1 minute"
+
+      - alert: ContainerHighCPU
+        expr: rate(container_cpu_usage_seconds_total{name=~"farmtally-.*"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: container
+        annotations:
+          summary: "Container high CPU usage"
+          description: "Container {{ $labels.name }} CPU usage is {{ $value }}% for more than 5 minutes"
+
+      - alert: ContainerHighMemory
+        expr: container_memory_usage_bytes{name=~"farmtally-.*"} / container_spec_memory_limit_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: container
+        annotations:
+          summary: "Container high memory usage"
+          description: "Container {{ $labels.name }} memory usage is {{ $value }}% for more than 5 minutes"
+
+      # Network Alerts
+      - alert: HighNetworkTraffic
+        expr: rate(node_network_receive_bytes_total[5m]) + rate(node_network_transmit_bytes_total[5m]) > 100000000
+        for: 5m
+        labels:
+          severity: warning
+          service: network
+        annotations:
+          summary: "High network traffic detected"
+          description: "Network traffic is {{ $value }} bytes/sec for more than 5 minutes on {{ $labels.instance }}"
+
+      # Endpoint Monitoring
+      - alert: EndpointDown
+        expr: probe_success == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: endpoint
+        annotations:
+          summary: "Endpoint is down"
+          description: "Endpoint {{ $labels.instance }} has been down for more than 1 minute"
+
+      - alert: EndpointSlowResponse
+        expr: probe_duration_seconds > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: endpoint
+        annotations:
+          summary: "Endpoint slow response"
+          description: "Endpoint {{ $labels.instance }} response time is {{ $value }}s for more than 5 minutes"
+
+      # SSL Certificate Alerts
+      - alert: SSLCertificateExpiringSoon
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 30
+        for: 1h
+        labels:
+          severity: warning
+          service: ssl
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate for {{ $labels.instance }} expires in {{ $value | humanizeDuration }}"
+
+      - alert: SSLCertificateExpired
+        expr: probe_ssl_earliest_cert_expiry - time() < 0
+        for: 1m
+        labels:
+          severity: critical
+          service: ssl
+        annotations:
+          summary: "SSL certificate expired"
+          description: "SSL certificate for {{ $labels.instance }} has expired"

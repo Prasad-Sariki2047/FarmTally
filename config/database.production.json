@@ -1,0 +1,54 @@
+{
+  "development": {
+    "username": "farmtally_dev_user",
+    "password": "dev_password",
+    "database": "farmtally_dev",
+    "host": "localhost",
+    "port": 5432,
+    "dialect": "postgres",
+    "logging": true
+  },
+  "production": {
+    "username": "farmtally_prod_user",
+    "password": "${POSTGRES_PASSWORD}",
+    "database": "farmtally_prod",
+    "host": "147.93.153.247",
+    "port": 5432,
+    "dialect": "postgres",
+    "logging": false,
+    "ssl": {
+      "require": true,
+      "rejectUnauthorized": false
+    },
+    "pool": {
+      "max": 20,
+      "min": 2,
+      "acquire": 60000,
+      "idle": 30000
+    },
+    "dialectOptions": {
+      "ssl": {
+        "require": true,
+        "rejectUnauthorized": false
+      },
+      "connectTimeout": 30000,
+      "requestTimeout": 30000
+    },
+    "retry": {
+      "match": [
+        "ETIMEDOUT",
+        "EHOSTUNREACH",
+        "ECONNRESET",
+        "ECONNREFUSED",
+        "ENOTFOUND",
+        "SequelizeConnectionError",
+        "SequelizeConnectionRefusedError",
+        "SequelizeHostNotFoundError",
+        "SequelizeHostNotReachableError",
+        "SequelizeInvalidConnectionError",
+        "SequelizeConnectionTimedOutError"
+      ],
+      "max": 3
+    }
+  }
+}
