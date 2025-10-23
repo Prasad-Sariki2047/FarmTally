@@ -39,6 +39,9 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Copy database files separately (since TypeScript doesn't copy .sql files)
+COPY --chown=farmtally:nodejs src/database/ ./dist/database/
+
 # Copy any additional configuration files if needed
 COPY --chown=farmtally:nodejs .env.example ./.env.example
 
